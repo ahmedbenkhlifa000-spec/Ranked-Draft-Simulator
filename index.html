@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ranked Draft Simulator</title>
+<style>
+:root{--bg:#090e1b;--panel:#131b2e;--panel2:#1b2740;--blue:#2f8cff;--red:#ff4d61;--gold:#ffd166;--text:#f4f7ff;--muted:#9eabc7}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#172747,#090e1b 60%);color:var(--text);font-family:Tahoma,Arial,sans-serif;min-height:100vh}
+header{position:sticky;top:0;z-index:20;padding:16px;background:#090e1bf2;border-bottom:1px solid #26334d;backdrop-filter:blur(12px)}.topnav{position:absolute;left:12px;top:14px;display:flex;gap:6px}.topnav button{min-height:34px;padding:6px 10px;font-size:12px;background:#1c2740}h1{margin:0;font-size:21px}.sub{font-size:12px;color:var(--muted);margin-top:5px}
+main{max-width:1000px;margin:auto;padding:14px}.screen{display:none}.screen.active{display:block}.card{background:linear-gradient(145deg,#151e32,#101728);border:1px solid #283653;border-radius:18px;padding:14px;margin-bottom:12px;box-shadow:0 12px 35px #0004}
+button,select,input{font:inherit;border-radius:13px;border:1px solid #31415f;padding:12px;color:white;background:#1c2740}button{cursor:pointer;font-weight:bold;min-height:46px}button.primary{background:linear-gradient(135deg,#2079ed,#54a5ff);border:0}button.red{background:linear-gradient(135deg,#ce3048,#ff6173);border:0}.menu button{width:100%;margin:6px 0;font-size:16px}
+.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.row>*{flex:1}.title{font-size:19px;font-weight:bold;margin:5px 0 14px}.small{color:var(--muted);font-size:12px}.badge{display:inline-block;background:#24324d;border-radius:999px;padding:6px 10px;font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:9px}.brawler{background:#151f35;border:2px solid #293754;border-radius:14px;overflow:hidden;text-align:center;cursor:pointer;min-height:155px}.brawler img{width:100%;height:105px;object-fit:contain;background:#0c1323;display:block}.brawler b{display:block;padding:7px 4px 3px;font-size:13px}.brawler small{display:block;padding-bottom:7px;color:var(--muted)}.brawler.owned{border-color:#3b90ff}.brawler.selected{outline:3px solid var(--blue);transform:scale(.98)}.confirm-text{color:var(--gold);font-weight:bold}.brawler.banned{opacity:.25;filter:grayscale(1)}
+.exclude-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.mapcheck{display:flex;gap:8px;align-items:center;padding:8px;border-radius:12px;background:#101827;border:2px solid #293754;cursor:pointer;min-height:95px}.mapcheck.excluded{opacity:.45;border-color:#ff4d61}.mapcheck img{width:82px;height:62px;object-fit:cover;border-radius:8px}.mapcard{display:flex;gap:12px;align-items:center}.mapcard img{width:130px;height:110px;object-fit:cover;border-radius:13px;background:#0c1323}.mapcard div{flex:1}.mapbig{width:100%;max-height:430px;object-fit:contain;border-radius:16px;background:#0b1221}
+.draft-top{display:flex;gap:10px;align-items:center;margin-bottom:8px}.draft-map-thumb{width:115px;height:75px;object-fit:cover;border-radius:12px;border:2px solid #425578;background:#0b1220}.draft-meta{flex:1}.timer{text-align:center;font-size:48px;color:var(--gold);font-weight:bold}.teams{display:grid;grid-template-columns:1fr 1fr;gap:10px}.team{border-radius:16px;padding:10px;background:#101827}.blue{border-top:4px solid var(--blue)}.redteam{border-top:4px solid var(--red)}.slots{display:flex;gap:6px}.slot{flex:1;min-height:70px;border-radius:10px;background:#0b1220;padding:7px;text-align:center;font-size:12px}.slot img{width:48px;height:48px;object-fit:contain;display:block;margin:auto}.slot-rating{margin-top:4px;font-size:11px;font-weight:bold;line-height:1.2}
+.score{font-size:42px;font-weight:bold}.blueText{color:var(--blue)}.redText{color:var(--red)}.notice{padding:11px;border-radius:12px;background:#1b2740;margin:9px 0}
+@media(max-width:600px){.grid{grid-template-columns:repeat(3,1fr)}.teams{grid-template-columns:1fr}.brawler{min-height:140px}.brawler img{height:88px}.mapcard img{width:105px;height:90px}}
+
+.analysisTitle{font-size:18px;font-weight:900;margin-bottom:12px}
+.analysisBlock{background:#101827;border:1px solid #2b3958;border-radius:12px;padding:10px;margin:8px 0;line-height:1.7}
+.matchupReport{display:grid;grid-template-columns:1fr;gap:8px;margin:10px 0}
+.matchup{background:#151f31;border-right:4px solid #4e8cff;padding:10px;border-radius:10px;line-height:1.65}
+.matchup small{display:block;margin-top:4px;color:#b7c7e6}
+
+
+.pick-rating{margin:10px 0;padding:12px;border-radius:14px;background:#142035;border:1px solid #334a70;line-height:1.7}
+.pick-rating.excellent{border-right:5px solid #39c77a}.pick-rating.good{border-right:5px solid #e3b341}.pick-rating.weak{border-right:5px solid #e05260}
+</style>
+</head>
+<body>
+<header><div class="topnav"><button onclick="goBack()">↩️ رجوع</button><button onclick="showScreen('home')">🏠 الرئيسية</button></div><h1>🏆 Ranked Draft Simulator</h1><div class="sub" id="status">جارٍ تحميل بيانات التحديث الحالي...</div></header>
+<main>
+<section id="home" class="screen active"><div class="card menu"><div class="title">محاكي Ranked Draft</div>
+<button class="primary" onclick="startSetup()">▶️ بدء Draft</button><button onclick="showBrawlers()">👤 شخصياتي</button><button onclick="showMaps()">🗺️ الخرائط المتاحة</button><button onclick="showStats()">📊 الإحصائيات</button><button onclick="showSettings()">⚙️ الإعدادات</button>
+</div><div class="notice">هذه النسخة تجلب أسماء الشخصيات وصورها وبيانات الخرائط من قاعدة بيانات BrawlAPI عند توفر الإنترنت.</div></section>
+
+<section id="setup" class="screen"><div class="card"><div class="title">🎮 إعداد الـDraft</div>
+<label id="modeLabel">نمط اللعب</label>
+<select id="mode"><option value="randomMode">🎲 اختيار نمط وخريطة عشوائيين</option></select><br><br>
+<div class="notice">🎲 سيتم اختيار خريطة واحدة فقط عشوائيًا من خرائط التحديث الحالي، ثم يبدأ الـDraft مباشرة دون إعادة اختيار.</div><br>
+<button type="button" onclick="openExcludedMaps()">🚫 حظر الخرائط التي لا أريد ظهورها</button>
+<div id="excludedInfo" class="small" style="margin:8px 0"></div><br>
+<label id="difficultyLabel">مستوى AI</label>
+<select id="difficulty"><option value="easy">🟢 سهل</option><option value="medium">🟡 متوسط</option><option value="hard">🟠 صعب</option><option value="pro">🔴 محترف</option></select><br><br>
+<button onclick="showScreen('home')">رجوع</button> <button class="primary" onclick="prepareDraft()">🎲 اختيار خريطة عشوائية</button></div></section>
+
+<section id="maps" class="screen"><div class="card"><div class="title">🗺️ الخرائط</div><div id="mapsList"></div><button onclick="showScreen('home')">الرئيسية</button></div></section>
+
+<section id="excludeMaps" class="screen"><div class="card">
+<div class="title">🚫 استبعاد الخرائط</div>
+<p class="small">الخرائط المحددة هنا لن تظهر عندما تختار نمطًا أو خريطة عشوائيًا. يتم حفظ اختيارك تلقائيًا.</p>
+<div class="row"><button onclick="setExcluded(false)">السماح بكل الخرائط</button><button class="red" onclick="setExcluded(true)">استبعاد المعروضة</button></div>
+<div id="excludeMapsList" class="exclude-grid"></div><br>
+<button class="primary" onclick="closeExcludedMaps()">✓ حفظ والعودة</button>
+</div></section>
+
+<section id="mapChooser" class="screen"><div class="card">
+<div class="title">🎲 اختر الخريطة</div>
+<p class="small">اختر واحدة من الخرائط العشوائية التالية. يمكنك أيضًا الضغط على إعادة السحب.</p>
+<div id="randomMapsList"></div>
+<button onclick="drawRandomMaps()">🎲 إعادة اختيار خرائط عشوائية</button>
+<button onclick="showScreen('setup')">رجوع</button>
+</div></section>
+
+<section id="mapScreen" class="screen"><div class="card"><div class="title">🗺️ الخريطة المختارة</div><h2 id="mapName"></h2><span id="mapMode" class="badge"></span><br><br><img id="mapImage" class="mapbig"><p id="mapDesc" class="small"></p><button class="primary" onclick="startBan()">🚫 بدء مرحلة الحظر</button></div></section>
+
+<section id="brawlers" class="screen"><div class="card"><div class="title">👤 شخصياتي <span id="ownedCount" class="badge"></span></div>
+<div class="row"><input id="search" placeholder="🔍 ابحث عن شخصية..." oninput="renderBrawlers()"><button onclick="setAll(true)">تحديد الكل</button><button onclick="setAll(false)">إلغاء الكل</button></div>
+<p class="small">اضغط على الشخصية لتحديد امتلاكها. يتم حفظ الاختيار تلقائيًا.</p><div id="brawlerList" class="grid"></div><br><button onclick="showScreen('home')">الرئيسية</button></div></section>
+
+<section id="draft" class="screen"><div class="card">
+<div class="draft-top">
+<img id="draftMapThumb" class="draft-map-thumb" alt="الخريطة">
+<div class="draft-meta"><div id="draftMap" class="badge"></div><br><span id="phase" class="badge"></span></div>
+</div>
+<div id="timer" class="timer">30</div><div id="turnText" class="title" style="text-align:center"></div>
+<div class="teams"><div class="team blue"><b>🔵 فريقي</b><div id="playerSlots" class="slots"></div></div><div class="team redteam"><b>🔴 الخصم</b><div id="aiSlots" class="slots"></div></div></div>
+<div class="notice">🚫 المحظورون: <span id="banList"></span></div><div id="instruction" class="title"></div><div id="draftBrawlers" class="grid"></div></div><div id="pickRating"></div></section>
+
+<section id="result" class="screen"><div class="card"><div class="title">🏆 تحليل الـDraft</div><div class="teams"><div class="team blue"><div>فريقك</div><div id="pScore" class="score blueText"></div></div><div class="team redteam"><div>الخصم</div><div id="aScore" class="score redText"></div></div></div><h2 id="winner"></h2><div id="analysis" style="line-height:2"></div><br><button class="primary" onclick="startSetup()">🔄 Draft جديد</button> <button onclick="showScreen('home')">🏠 الرئيسية</button></div></section>
+
+<section id="stats" class="screen"><div class="card"><div class="title">📊 الإحصائيات</div><div id="statsContent"></div><button onclick="showScreen('home')">الرئيسية</button></div></section>
+<section id="settings" class="screen"><div class="card"><div class="title">⚙️ الإعدادات</div>
+<label id="languageLabel">🌐 اللغة</label><br>
+<select id="languageSelect" onchange="changeLanguage(this.value)">
+<option value="ar">العربية</option><option value="en">English</option><option value="fr">Français</option><option value="es">Español</option><option value="tr">Türkçe</option>
+</select><br><br>
+<label><input id="timerEnabled" type="checkbox" checked onchange="saveSettings()"> تشغيل المؤقت</label><br><br><button onclick="showScreen('home')">الرئيسية</button></div></section>
+</main>
+
+<script>
+const API="https://api.brawlapi.com/v1";
+const FALLBACK=[
+"Shelly","Nita","Colt","Bull","Brock","Rico","Spike","Barley","Jessie","Dynamike","El Primo","Mortis","Crow","Poco","Bo","Piper","Pam","Tara","Darryl","Penny","Frank","Gene","Tick","Leon","Rosa","Carl","Bibi","8-Bit","Sandy","Bea","Emz","Mr. P","Max","Jacky","Gale","Nani","Sprout","Surge","Colette","Amber","Lou","Byron","Edgar","Ruffs","Stu","Belle","Squeak","Grom","Buzz","Griff","Ash","Meg","Lola","Fang","Eve","Janet","Bonnie","Otis","Sam","Gus","Buster","Chester","Gray","Mandy","R-T","Willow","Maisie","Hank","Cordelius","Doug","Pearl","Chuck","Charlie","Mico","Kit","Larry & Lawrie","Melodie","Angelo","Draco","Lily","Berry","Clancy","Moe","Kenji","Shade","Juju","Meeple","Ollie","Lumi","Finx","Jae-Yong","Kaze","Alli","Trunk","Mina","Ziggy","Pierce","Gigi","Glowy","Sirius","Najia","Damian","Starr Nova","Bolt","Nori","Wendy"
+];
+let brawlers=[],maps=[],owned=JSON.parse(localStorage.getItem("ownedBrawlers")||"[]");
+let settings=JSON.parse(localStorage.getItem("settings")||'{"timer":true}');
+let stats=JSON.parse(localStorage.getItem("stats")||'{"drafts":0,"wins":0,"losses":0,"draws":0}');
+let game={map:null,mode:null,diff:"medium",bans:[],player:[],ai:[],phase:"ban",turn:"player",timer:30,interval:null};
+
+function showScreen(id){document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));document.getElementById(id).classList.add("active");window.scrollTo(0,0)}
+function img(b){return b.imageUrl2||b.imageUrl||""}
+function byName(n){return brawlers.find(x=>x.name===n)}
+function safe(s){return String(s).replace(/'/g,"&#39;")}
+async function loadData(){
+ try{
+  const [br,mr]=await Promise.all([fetch(API+"/brawlers"),fetch(API+"/maps")]);
+  const bj=await br.json(), mj=await mr.json();
+  brawlers=(bj.list||bj).filter(x=>x.released!==false);
+  maps=(mj.list||mj).filter(x=>x.disabled!==true);
+  document.getElementById("status").textContent=`تم تحميل ${brawlers.length} شخصية وبيانات الخرائط الحالية`;
+ }catch(e){
+  brawlers=FALLBACK.map((name,i)=>({name,id:i+1,imageUrl2:"",class:{name:"غير محدد"}}));
+  maps=[];
+  document.getElementById("status").textContent="تعذر الاتصال بقاعدة البيانات — تم تشغيل القائمة الاحتياطية";
+ }
+ if(!owned.length)owned=brawlers.map(x=>x.name);
+ localStorage.setItem("ownedBrawlers",JSON.stringify(owned));
+ fillModes();renderBrawlers();
+}
+function fillModes(){
+ const usable=[...new Set(currentUpdateMaps().map(x=>x.gameMode?.name).filter(Boolean))];
+ document.getElementById("mode").innerHTML='<option value="randomMode">🎲 نمط وخريطة عشوائيان</option>'+usable.map(x=>`<option value="${x}">${x}</option>`).join("");
+}
+function showBrawlers(){renderBrawlers();showScreen("brawlers")}
+function renderBrawlers(){
+ const q=(document.getElementById("search")?.value||"").toLowerCase();
+ const list=brawlers.filter(x=>x.name.toLowerCase().includes(q));
+ document.getElementById("ownedCount").textContent=`${owned.length}/${brawlers.length}`;
+ document.getElementById("brawlerList").innerHTML=list.map(b=>`<div class="brawler ${owned.includes(b.name)?"owned":""}" onclick="toggleOwned('${safe(b.name)}')">${img(b)?`<img loading="lazy" src="${img(b)}" onerror="this.style.display='none'">`:""}<b>${b.name}</b><small>${b.class?.name||""}<br>${owned.includes(b.name)?"✓ أملكها":"✕ لا أملكها"}</small></div>`).join("");
+}
+function toggleOwned(n){owned.includes(n)?owned=owned.filter(x=>x!==n):owned.push(n);localStorage.setItem("ownedBrawlers",JSON.stringify(owned));renderBrawlers()}
+function setAll(v){owned=v?brawlers.map(x=>x.name):[];localStorage.setItem("ownedBrawlers",JSON.stringify(owned));renderBrawlers()}
+function startSetup(){
+ showScreen("setup");
+ const ex=excludedMaps();
+ const info=document.getElementById("excludedInfo");if(info)info.textContent=`عدد خرائط الرانك المحظورة: ${ex.length}`;
+}
+// قائمة خرائط Ranked الحالية فقط (الموسم الحالي)
+const CURRENT_RANKED_MAPS={
+ "Gem Grab":["Crystal Arcade","Double Swoosh","Gem Fort","Hard Rock Mine","Rustic Arcade","Undermine"],
+ "Heist":["Bridge Too Far","Hot Potato","Kaboom Canyon","Pit Stop","Safe Zone","Safe(r) Zone"],
+ "Bounty":["Dry Season","Hideout","Layer Cake","Shooting Star"],
+ "Brawl Ball":["Beach Ball","Center Stage","Pinball Dreams","Sneaky Fields","Spiraling Out","Triple Dribble"],
+ "Hot Zone":["Dueling Beetles","Open Business","Parallel Plays","Ring of Fire"],
+ "Knockout":["Belle's Rock","Flaring Phoenix","New Horizons","Out in the Open"]
+};
+function rankedModeNames(){return Object.keys(CURRENT_RANKED_MAPS);}
+function mapKey(m){return `${m.gameMode?.name||""}::${m.name}`;}
+function currentUpdateMaps(){
+ // لا نقبل أي خريطة من API إلا إذا كان اسمها موجودًا صراحة في قائمة Ranked الحالية
+ return maps.filter(m=>{
+   const mode=m.gameMode?.name||"";
+   return CURRENT_RANKED_MAPS[mode]?.includes(m.name);
+ });
+}
+function excludedMaps(){return JSON.parse(localStorage.getItem("excludedRankedMaps")||"[]");}
+function getSelectableRankedMaps(){
+ const ex=excludedMaps();
+ return currentUpdateMaps().filter(m=>!ex.includes(mapKey(m)));
+}
+function openExcludedMaps(){
+ const source=currentUpdateMaps(), ex=excludedMaps();
+ document.getElementById("excludeMapsList").innerHTML=source.map(m=>{
+   const key=mapKey(m), blocked=ex.includes(key);
+   return `<div class="mapcheck ${blocked?"excluded":""}" onclick="toggleExcludedMap('${String(key).replace(/'/g,"&#39;")}')">
+   ${m.imageUrl?`<img loading="lazy" src="${m.imageUrl}">`:""}
+   <div><b>${m.name}</b><br><small>${m.gameMode?.name||""}</small><br><small>${blocked?"🚫 لن تظهر":"✓ مسموح بها"}</small></div></div>`;
+ }).join("");
+ document.getElementById("excludedInfo").textContent=`عدد خرائط الرانك المحظورة: ${ex.length}`;
+ showScreen("excludeMaps");
+}
+function toggleExcludedMap(key){
+ let ex=excludedMaps();
+ ex.includes(key)?ex=ex.filter(x=>x!==key):ex.push(key);
+ localStorage.setItem("excludedRankedMaps",JSON.stringify(ex));
+ openExcludedMaps();
+}
+function setExcluded(all){
+ if(all)localStorage.setItem("excludedRankedMaps",JSON.stringify(currentUpdateMaps().map(mapKey)));
+ else localStorage.setItem("excludedRankedMaps","[]");
+ openExcludedMaps();
+}
+function closeExcludedMaps(){showScreen("setup");}
+function prepareDraft(){
+ game.diff=document.getElementById("difficulty").value;
+ let pool=getSelectableRankedMaps();
+ const selected=document.getElementById("mode").value;
+ if(selected!=="randomMode")pool=pool.filter(m=>m.gameMode?.name===selected);
+ if(!pool.length){alert("كل خرائط هذا الاختيار محظورة. ادخل إلى «حظر الخرائط» وأعد السماح ببعض الخرائط.");return}
+ game.map=pool[Math.floor(Math.random()*pool.length)];
+ game.mode=game.map.gameMode?.name||"";
+ startBan();
+}
+function goBack(){
+ const active=document.querySelector(".screen.active")?.id;
+ const previous={setup:"home",brawlers:"home",maps:"home",excludeMaps:"setup",mapChooser:"setup",mapScreen:"setup",draft:"setup",result:"home",stats:"home",settings:"home"};
+ if(active==="draft"&&game.interval)clearInterval(game.interval);
+ showScreen(previous[active]||"home");
+}
+function shuffle(arr){for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}return arr}
+function renderRandomMaps(){
+ document.getElementById("randomMapsList").innerHTML=(game.randomPool||[]).map(m=>mapOptionHTML(m)).join("");
+}
+function drawRandomMaps(){
+ let pool=maps.filter(x=>x.gameMode?.name===game.mode);
+ const count=Math.min(Number(document.getElementById("mapsCount").value||5),pool.length);
+ game.randomPool=shuffle([...pool]).slice(0,count);renderRandomMaps();
+}
+function renderAllModeMaps(pool){
+ document.getElementById("randomMapsList").innerHTML=pool.map(m=>mapOptionHTML(m)).join("");
+}
+function mapOptionHTML(m){
+ const escaped=String(m.name).replace(/'/g,"&#39;");
+ return `<div class="card mapcard" onclick="selectMapByName('${escaped}')" style="cursor:pointer">${m.imageUrl?`<img loading="lazy" src="${m.imageUrl}">`:""}<div><b>${m.name}</b><br><span class="badge">${m.gameMode?.name||game.mode}</span><br><br><button class="primary">اختيار هذه الخريطة</button></div></div>`;
+}
+function selectMapByName(name){
+ game.map=maps.find(x=>x.name===name&&x.gameMode?.name===game.mode);
+ if(!game.map)return;
+ document.getElementById("mapName").textContent=game.map.name;
+ document.getElementById("mapMode").textContent=game.mode;
+ document.getElementById("mapImage").src=game.map.imageUrl||"";
+ document.getElementById("mapDesc").textContent="الخريطة المختارة: "+game.map.name+" — يمكنك الآن بدء الـDraft.";
+ showScreen("mapScreen");
+}
+function showMaps(){
+ const list=currentUpdateMaps();
+ document.getElementById("mapsList").innerHTML=list.map(m=>`<div class="card mapcard">${m.imageUrl?`<img loading="lazy" src="${m.imageUrl}">`:""}<div><b>${m.name}</b><br><span class="badge">${m.gameMode?.name||""}</span></div></div>`).join("");
+ showScreen("maps");
+}
+function startBan(){
+ if(owned.length<3){alert("حدد 3 شخصيات على الأقل أولًا.");showBrawlers();return}
+ Object.assign(game,{bans:[],player:[],ai:[],playerRatings:[],phase:"ban",turn:"player",timer:20,playerBans:[],aiBans:[],banReveal:false,pendingBan:null,pickIndex:0,playerRatings:[]});
+ showScreen("draft"); renderDraft(); startTimer();
+}
+function available(){return brawlers.filter(b=>!game.bans.includes(b.name)&&!game.player.includes(b.name)&&!game.ai.includes(b.name))}
+function ratingVisual(pct){
+ let icon="🔴"; if(pct>=15)icon="🟠";if(pct>=35)icon="🟡";if(pct>=55)icon="🟢";if(pct>=80)icon="🔵";
+ return `${icon} ${pct}/100`;
+}
+function renderSlots(arr,side){return [0,1,2].map(i=>{let b=byName(arr[i]);let r=side==="player"?game.playerRatings?.[i]:null;return `<div class="slot">${b?`${img(b)?`<img src="${img(b)}">`:""}${b.name}${r?`<div class="slot-rating">🤖 ${ratingVisual(r.pct)}</div>`:""}`:"—"}</div>`}).join("")}
+function renderDraft(){
+ document.getElementById("draftMap").textContent=`🗺️ ${game.map.name} • ${game.mode}`;
+ document.getElementById("draftMapThumb").src=game.map.imageUrl||"";
+ document.getElementById("phase").textContent=game.phase==="ban"?"🚫 BAN • 3 شخصيات":"🎯 PICK";
+ document.getElementById("timer").textContent=game.timer;
+ document.getElementById("playerSlots").innerHTML=renderSlots(game.player,"player");
+ document.getElementById("aiSlots").innerHTML=renderSlots(game.ai,"ai");
+ document.getElementById("banList").textContent=game.bans.join(" • ")||"لا يوجد";
+ const grid=document.getElementById("draftBrawlers");
+ if(game.phase==="ban"){
+   document.getElementById("turnText").textContent=`🚫 الحظر المتزامن (${game.playerBans.length}/3)`;
+   document.getElementById("instruction").innerHTML=game.pendingBan?`اضغط على <b>${game.pendingBan}</b> مرة أخرى للتأكيد: <span class="confirm-text">هل أنت متأكد من حظرها؟</span>`:`اختر شخصية للحظر — بعد الضغط عليها اضغط عليها مرة ثانية للتأكيد. حظر الروبوت سري.`;
+   grid.innerHTML=available().map(b=>{const pending=game.pendingBan===b.name; const done=game.playerBans.includes(b.name); return `<div class="brawler ${pending?"selected":""} ${done?"banned":""}" onclick="playerAction('${safe(b.name)}')">${img(b)?`<img loading="lazy" src="${img(b)}">`:""}<b>${b.name}</b><small>${done?"🚫 تم حظرها":pending?"هل أنت متأكد؟ اضغط مرة أخرى":"اضغط للحظر"}</small></div>`}).join("");
+ } else {
+   document.getElementById("turnText").textContent=game.turn==="player"?"🔵 دورك في الاختيار":"🔴 الذكاء الاصطناعي يختار...";
+   document.getElementById("instruction").textContent=game.turn==="player"?(game.pendingPick?"هل أنت متأكد؟ اضغط مرة أخرى على نفس الشخصية لتأكيد الاختيار":"اضغط على الشخصية ثم اضغط عليها مرة ثانية لتأكيد الاختيار"):"AI يحلل الخيارات...";
+   const selectable=game.turn==="player"?available().filter(b=>owned.includes(b.name)):[];
+   grid.innerHTML=available().map(b=>{const pending=game.pendingPick===b.name;return `<div class="brawler ${pending?"selected":""}" onclick="${selectable.some(x=>x.name===b.name)?`playerAction('${safe(b.name)}')`:""}">${img(b)?`<img loading="lazy" src="${img(b)}">`:""}<b>${b.name}</b>${pending?`<small style="color:#ffd166;font-weight:bold">هل أنت متأكد؟ اضغط مرة أخرى ✓</small>`:""}</div>`}).join("");
+   if(game.turn==="ai")setTimeout(aiTurn,700);
+ }
+}
+// ================= ADVANCED DRAFT AI ENGINE =================
+// محرك تقييم متعدد العوامل: الخريطة + النمط + الـCounters + الـSynergy + تكوين الفريق
+function traits(b){
+ const n=(b.name||"").toLowerCase();
+ const c=(b.class?.name||"").toLowerCase();
+ const t={
+  name:n,id:b.id||0,
+  range:5,mobility:5,damage:5,control:5,survival:5,
+  tank:0,assassin:0,support:0,thrower:0,marksman:0,controller:0
+ };
+ if(/marksman|sniper/.test(c)){t.range=10;t.marksman=1;t.damage=7;t.survival=4}
+ if(/artillery|thrower/.test(c)){t.range=8;t.thrower=1;t.control=9;t.mobility=4}
+ if(/tank/.test(c)){t.tank=1;t.survival=10;t.damage=8;t.range=3;t.mobility=5}
+ if(/assassin/.test(c)){t.assassin=1;t.mobility=10;t.damage=8;t.range=4;t.survival=5}
+ if(/support/.test(c)){t.support=1;t.control=7;t.survival=7}
+ if(/controller/.test(c)){t.controller=1;t.control=10;t.range=7}
+ if(/damage dealer|fighter/.test(c)){t.damage=9;t.range=6}
+ return t;
+}
+
+// خصائص الخريطة المستنتجة من النمط + اسم الخريطة
+function mapProfile(){
+ const name=(game.map?.name||"").toLowerCase();
+ const mode=game.mode||"";
+ let p={open:5,walls:5,bushes:5,lanes:5,objective:"balanced"};
+ if(["Bounty","Knockout"].includes(mode)){p.open=9;p.lanes=9;p.walls=3;p.objective="elimination"}
+ if(mode==="Gem Grab"){p.open=5;p.walls=7;p.bushes=6;p.objective="control"}
+ if(mode==="Hot Zone"){p.open=5;p.walls=8;p.bushes=6;p.objective="area"}
+ if(mode==="Brawl Ball"){p.open=4;p.walls=7;p.bushes=7;p.objective="push"}
+ if(mode==="Heist"){p.open=6;p.walls=6;p.lanes=8;p.objective="damage"}
+ if(/open|shooting|out in|dry/.test(name)){p.open=10;p.walls=2;p.bushes=2}
+ if(/rock|mine|hideout|beetle|bush/.test(name)){p.open=Math.max(3,p.open-2);p.walls=Math.min(10,p.walls+2);p.bushes=Math.min(10,p.bushes+2)}
+ return p;
+}
+
+function mapFit(b){
+ const t=traits(b),m=mapProfile();let score=50;
+ score+=t.range*(m.open/10)*3;
+ score+=t.control*(m.walls/10)*2.2;
+ score+=t.mobility*(m.bushes/10)*1.5;
+ if(m.open>7&&t.marksman)score+=18;
+ if(m.walls>7&&(t.thrower||t.controller))score+=16;
+ if(m.bushes>7&&(t.assassin||t.tank))score+=10;
+ if(m.objective==="area")score+=t.control*2.5+t.survival;
+ if(m.objective==="elimination")score+=t.range*2.2+t.damage;
+ if(m.objective==="push")score+=t.tank*12+t.mobility*1.2+t.control;
+ if(m.objective==="damage")score+=t.damage*2+t.range;
+ if(m.objective==="control")score+=t.control*2+t.range;
+ return score;
+}
+
+// ================= CONTEXTUAL MATCHUP ENGINE =================
+// لا يوجد "Counter" ثابت: نتيجة المواجهة تتغير حسب الخريطة والنمط والجدران والمساحة.
+function matchupAnalysis(a,b){
+ const A=traits(a), B=traits(b), m=mapProfile();
+ let score=0, reasons=[], prevents=[];
+
+ // المدى يصبح أقوى في الخرائط المفتوحة وأقل تأثيرًا خلف الجدران.
+ const rangeDiff=A.range-B.range;
+ if(m.open>=7 && rangeDiff>=2){
+   score+=rangeDiff*3.2;
+   reasons.push(`مدى ${a.name} يسمح له بالضغط من مسافة آمنة في الخريطة المفتوحة`);
+ }
+ if(m.open>=7 && rangeDiff<=-2){
+   score+=rangeDiff*2.8;
+ }
+
+ // الجدران تساعد الرماة غير المباشرين، المتحكمين، والمقاتلين القريبين على تقليل أفضلية المدى.
+ if(m.walls>=7){
+   if(A.thrower){score+=13;reasons.push(`${a.name} يستفيد من الجدران لمهاجمة الخصم من خلف الغطاء`)}
+   if(A.controller){score+=8;reasons.push(`${a.name} يستطيع استخدام الجدران والممرات للسيطرة على المساحة`)}
+   if(A.assassin||A.tank){score+=5;reasons.push(`${a.name} يستطيع الاقتراب مستفيدًا من الغطاء`)}
+   if(B.marksman && (A.thrower||A.assassin||A.tank)){
+      score+=7;
+      prevents.push(`الجدران تقلل قدرة ${b.name} على الحفاظ على مسافة آمنة`);
+   }
+   if(A.marksman && (B.thrower||B.assassin||B.tank)) score-=6;
+ }
+
+ // الشجيرات تزيد قيمة الكمائن والتنقل.
+ if(m.bushes>=7){
+   if(A.assassin){score+=7;reasons.push(`${a.name} يستفيد من الشجيرات للكمائن والمفاجأة`)}
+   if(A.tank){score+=5;reasons.push(`${a.name} يستطيع استخدام الشجيرات لتقليل التعرض للضرر قبل الاقتراب`)}
+ }
+
+ // الحركة ليست مجرد سرعة: مهمة لمنع القتل أو الهروب أو تغيير المسار.
+ const mobDiff=A.mobility-B.mobility;
+ if(mobDiff>=3){
+   score+=mobDiff*1.6;
+   prevents.push(`${a.name} يملك حركة أفضل تساعده على الهروب أو تفادي محاولة قتل الخصم`);
+ }
+ if(mobDiff<=-3) score+=mobDiff*1.4;
+
+ // الضرر والبقاء: أقوى عندما تكون المسافة قصيرة أو الهدف مطلوب السيطرة عليه.
+ if(A.damage>=B.damage+3 && (m.open<7 || m.objective==="push")){
+   score+=5; reasons.push(`ضرر ${a.name} العالي يصبح أكثر تأثيرًا في الاشتباكات القريبة`);
+ }
+ if(A.survival>=B.survival+3 && ["area","control","push"].includes(m.objective)){
+   score+=5; reasons.push(`${a.name} يستطيع البقاء مدة أطول داخل منطقة الهدف`);
+ }
+
+ // التفاعل بين الأدوار، لكن بدون اعتباره حكمًا نهائيًا.
+ if(A.assassin&&B.marksman&&m.open<7){score+=8;reasons.push(`${a.name} يستطيع تهديد ${b.name} عند تقليص المسافة`)}
+ if(A.marksman&&B.tank&&m.open>=7){score+=9;reasons.push(`${a.name} يستطيع إيقاف تقدم ${b.name} قبل الوصول إليه`);prevents.push(`المدى الطويل يمنع ${b.name} من التقدم بحرية`)}
+ if(A.controller&&B.assassin){score+=5;reasons.push(`${a.name} يملك أدوات أفضل لتقييد مسارات الاقتراب`)}
+ if(A.thrower&&m.walls>=7){score+=7;prevents.push(`${a.name} يمنع الخصم من الاحتماء خلف الجدران بسهولة`)}
+
+ // أهمية الهدف في النمط.
+ if(["area","control"].includes(m.objective)&&A.control>B.control+2){
+   score+=6; reasons.push(`${a.name} أقوى في منع الخصم من السيطرة على الهدف`);
+ }
+ if(m.objective==="elimination"&&A.range>B.range+2&&m.open>=6){
+   score+=5; reasons.push(`القدرة على بدء الاشتباك من مدى أبعد تمنح ${a.name} أفضلية`);
+ }
+
+ // سبب عام إذا لم توجد قاعدة قوية.
+ if(!reasons.length) reasons.push(`المواجهة متقاربة وتعتمد على التموضع واستغلال الخريطة`);
+ return {score,reasons,prevents,map:m};
+}
+
+function counterScore(a,b){
+ return matchupAnalysis(a,b).score;
+}
+
+function counterAgainstTeam(b,enemyNames){
+ const obj=enemyNames.map(byName).filter(Boolean);
+ if(!obj.length)return 0;
+ return obj.reduce((sum,e)=>sum+matchupAnalysis(b,e).score,0)/obj.length;
+}
+
+// تفسير منظم لجميع المواجهات بعد الـDraft
+function buildMatchupReport(){
+ const rows=[];
+ for(const pn of game.player){
+   const P=byName(pn); if(!P) continue;
+   for(const an of game.ai){
+     const A=byName(an); if(!A) continue;
+     const pa=matchupAnalysis(P,A), ap=matchupAnalysis(A,P);
+     const diff=pa.score-ap.score;
+     let winner, text, prevention=[];
+     if(diff>3){
+       winner=`🔵 ${P.name}`;
+       text=pa.reasons.slice(0,2).join(" • ");
+       prevention=pa.prevents.slice(0,2);
+     }else if(diff<-3){
+       winner=`🔴 ${A.name}`;
+       text=ap.reasons.slice(0,2).join(" • ");
+       prevention=ap.prevents.slice(0,2);
+     }else{
+       winner="⚖️ مواجهة متقاربة";
+       text=`لا توجد أفضلية ثابتة؛ نتيجة المواجهة تتأثر بالتموضع والجدران والمسافة.`;
+     }
+     rows.push(`<div class="matchup"><b>${P.name} 🆚 ${A.name}</b><br><b>${winner}</b><br><span>${text}</span>${prevention.length?`<br><small>🛡️ يمنع/يقلل: ${prevention.join(" • ")}</small>`:""}</div>`);
+   }
+ }
+ return rows.join("");
+}
+// Synergy حقيقي نسبيًا: نكافئ التنوع وتكامل الأدوار بدل تكرار نفس الدور
+function teamSynergyScore(candidate,teamNames){
+ const all=[...teamNames,candidate.name].map(n=>typeof n==="string"?byName(n):candidate).filter(Boolean);
+ if(all.length<2)return 0;
+ const ts=all.map(traits);let score=0;
+ const ranges=ts.map(x=>x.range);
+ const roles=["tank","assassin","support","thrower","marksman","controller"];
+ roles.forEach(role=>{
+   const count=ts.filter(x=>x[role]).length;
+   if(count===1)score+=3;
+   if(count>=3)score-=8*(count-2);
+ });
+ // وجود مدى قريب + متوسط + بعيد أفضل من التكرار
+ if(Math.min(...ranges)<=4&&Math.max(...ranges)>=8)score+=10;
+ // دعم فريق مفيد لكن لا نريد 3 دعم
+ const supports=ts.filter(x=>x.support).length;
+ if(supports===1)score+=6;if(supports>=2)score-=5;
+ // السيطرة مهمة في أغلب الأنماط
+ if(ts.some(x=>x.control>=8))score+=5;
+ return score;
+}
+
+function teamWeaknessPenalty(candidate,teamNames){
+ const ts=[...teamNames.map(byName).filter(Boolean),candidate].map(traits);
+ if(ts.length<2)return 0;let p=0;
+ const avgRange=ts.reduce((s,x)=>s+x.range,0)/ts.length;
+ if(avgRange<4.5)p+=12;
+ if(ts.filter(x=>x.mobility>=8).length===0)p+=7;
+ if(ts.filter(x=>x.survival>=8).length===0)p+=5;
+ if(ts.filter(x=>x.range>=8).length===0&&mapProfile().open>7)p+=14;
+ return p;
+}
+
+// تقييم اختيار اللاعب/AI في سياق كامل
+function evaluateCandidate(b,side){
+ const enemy=side==="ai"?game.player:game.ai;
+ const own=side==="ai"?game.ai:game.player;
+ const map=mapFit(b);
+ const counter=counterAgainstTeam(b,enemy);
+ const synergy=teamSynergyScore(b,own);
+ const weakness=teamWeaknessPenalty(b,own);
+ // قيمة مستقبلية: الاحتفاظ بالاختيارات القوية للـDraft المتبقي
+ const availability=available().length;
+ const urgency=counter*(enemy.length>0?1.25:0)+(map-50)/12;
+ return map*0.48+counter*2.8+synergy*2.1+urgency*1.4-weakness*1.7+(availability<8?3:0);
+}
+
+function predictOpponentResponse(candidate){
+ // تقدير بسيط: هل اختيار هذه الشخصية سيجعل الخصم يملك Counter قوي؟
+ const enemies=available().filter(x=>x.name!==candidate.name);
+ const top=enemies.map(e=>counterScore(e,candidate)).sort((a,b)=>b-a)[0]||0;
+ return top;
+}
+
+
+function evaluatePlayerPick(b){
+ const candidates=available().filter(x=>owned.includes(x.name));
+ const ranked=candidates.map(x=>({b:x,score:evaluateCandidate(x,"player")})).sort((a,b)=>b.score-a.score);
+ const chosen=evaluateCandidate(b,"player"), best=ranked[0]?.score||chosen||1;
+ const pct=Math.max(1,Math.min(100,Math.round(chosen/best*100)));
+ if(pct>=90)return {pct,cls:"excellent",txt:"🟢 اختيار ممتاز — يستفيد بقوة من الخريطة والتشكيلة الحالية.",best:ranked[0]?.b?.name};
+ if(pct>=70)return {pct,cls:"good",txt:"🟡 اختيار جيد — منطقي، لكن توجد بدائل أقوى تكتيكيًا.",best:ranked[0]?.b?.name};
+ return {pct,cls:"weak",txt:"🔴 اختيار ضعيف نسبيًا — لا يستغل الوضع الحالي بأفضل شكل.",best:ranked[0]?.b?.name};
+}
+function showPlayerPickRating(b){
+ const r=evaluatePlayerPick(b),e=document.getElementById("pickRating");
+ if(e)e.innerHTML=`<div class="pick-rating ${r.cls}"><b>${r.txt} ${r.pct}/100</b>${r.best&&r.best!==b.name?`<br><small>💡 أفضل بديل حاليًا: ${r.best}</small>`:""}</div>`;
+}
+function aiBestChoice(){
+ const candidates=available();
+ if(!candidates.length)return null;
+ let scored=candidates.map(b=>{
+   let score=evaluateCandidate(b,"ai");
+   // في بداية الـDraft نركز أكثر على قوة الخريطة، وفي النهاية على الـCounter والتشكيلة
+   if(game.ai.length===0)score+=mapFit(b)*0.25;
+   if(game.ai.length>=1)score+=counterAgainstTeam(b,game.player)*1.4;
+   // تجنب اختيار يمكن مواجهته بسهولة جدًا إذا كانت البدائل قريبة
+   score-=predictOpponentResponse(b)*0.45;
+   return {b,score};
+ }).sort((x,y)=>y.score-x.score);
+
+ const diff=game.diff;
+ if(diff==="pro")return scored[0].b;
+ if(diff==="hard")return scored[Math.floor(Math.random()*Math.min(2,scored.length))].b;
+ if(diff==="medium")return scored[Math.floor(Math.random()*Math.min(5,scored.length))].b;
+ return scored[Math.floor(Math.random()*Math.min(12,scored.length))].b;
+}
+
+function scoreBrawler(b){return evaluateCandidate(b,"ai");}
+function chooseAIBans(){
+ const ranked=available().map(b=>({b,score:mapFit(b)*.7+counterAgainstTeam(b,game.player)*2})).sort((a,b)=>b.score-a.score);
+ const lim=game.diff==="easy"?12:game.diff==="medium"?7:game.diff==="hard"?4:3;
+ return ranked.slice(0,Math.min(lim,ranked.length)).sort(()=>Math.random()-.5).slice(0,3).map(x=>x.b.name);
+}
+function finishBanPhase(){
+ if(game.phase!=="ban")return; clearInterval(game.interval);
+ if(!game.aiBans || game.aiBans.length<3) game.aiBans=chooseAIBans();
+ game.bans=[...new Set([...game.playerBans,...game.aiBans])];
+ game.phase="pick"; game.pickIndex=0; game.turn="player"; game.timer=30; game.pendingBan=null;
+ renderDraft(); startTimer();
+}
+function aiTurn(){
+ if(game.turn!=="ai"||game.phase!=="pick")return;
+ const pick=aiBestChoice(); if(!pick){finishDraft();return}; game.ai.push(pick.name); game.pickIndex++; nextTurn();
+}
+function playerAction(n){
+  const b=byName(n);if(!b)return;
+  if(game.phase==="ban"){
+    if((game.playerBans||[]).length>=3)return;
+    if((game.playerBans||[]).includes(n))return;
+    if(game.pendingBan!==n){game.pendingBan=n;renderDraft();return;}
+    // التأكيد الثاني يحفظ الحظر بدون إيقاف مؤقت الـ20 ثانية
+    game.pendingBan=null;
+    game.playerBans.push(n);
+    renderDraft();
+    // الروبوت يختار حظوراته سرًا في نفس المرحلة، لذلك نبدأ الـPick فور إكمال حظورات اللاعب الثلاثة
+    if(game.playerBans.length>=3) finishBanPhase();
+  }else{
+    if(!owned.includes(n))return;
+    if(game.pendingPick!==n){game.pendingPick=n;renderDraft();return;}
+    clearInterval(game.interval);game.pendingPick=null;
+    const rating=evaluatePlayerPick(b);showPlayerPickRating(b);game.player.push(n);game.playerRatings=(game.playerRatings||[]);game.playerRatings.push(rating);game.pickIndex=(game.pickIndex||0)+1;setTimeout(nextTurn,900);
+  }
+}
+function nextTurn(){
+ clearInterval(game.interval); const order=["player","ai","ai","player","player","ai"];
+ if(game.pickIndex>=order.length){finishDraft();return}; game.turn=order[game.pickIndex]; game.timer=30; renderDraft(); startTimer();
+}
+function startTimer(){
+ clearInterval(game.interval); if(!settings.timer)return;
+ game.interval=setInterval(()=>{game.timer--; const e=document.getElementById("timer"); if(e)e.textContent=Math.max(0,game.timer); if(game.timer<=0){clearInterval(game.interval); if(game.phase==="ban")finishBanPhase(); else if(game.phase==="pick"&&game.turn==="player"){const a=available().filter(b=>owned.includes(b.name));if(a.length)playerAction(a[0].name)}}},1000)
+}
+function teamPower(names,enemyNames){
+ let total=0;
+ names.forEach(n=>{
+   const b=byName(n);if(!b)return;
+   total+=mapFit(b)*0.55;
+   total+=counterAgainstTeam(b,enemyNames)*3;
+   total+=teamSynergyScore(b,names.filter(x=>x!==n))*1.5;
+ });
+ const objs=names.map(byName).filter(Boolean);
+ const ts=objs.map(traits);
+ if(ts.length===3){
+   if(new Set(ts.map(x=>x.range>=8?"long":x.range<=4?"close":"mid")).size>=2)total+=20;
+   if(ts.some(x=>x.control>=8))total+=10;
+   if(ts.some(x=>x.mobility>=8))total+=8;
+ }
+ return total;
+}
+function finishDraft(){
+ clearInterval(game.interval);
+ const rawP=teamPower(game.player,game.ai);
+ const rawA=teamPower(game.ai,game.player);
+ const total=rawP+rawA||1;
+ let pScore=Math.max(5,Math.min(95,Math.round(rawP/total*100)));
+ let aScore=100-pScore;
+
+ document.getElementById("pScore").textContent=pScore+"/100";
+ document.getElementById("aScore").textContent=aScore+"/100";
+ document.getElementById("winner").textContent=pScore>aScore+6?"🏆 أفضلية فريقك":aScore>pScore+6?"🔴 أفضلية الخصم":"⚔️ Draft متقارب";
+
+ const mp=mapProfile();
+ const mapDescription=mp.open>=8
+   ?"خريطة مفتوحة: المدى والضغط من بعيد لهما قيمة كبيرة."
+   :mp.walls>=8
+   ?"خريطة مليئة بالجدران: الغطاء، الالتفاف، والرمي فوق الجدران أكثر أهمية."
+   :"خريطة متوازنة: لا يوجد أسلوب واحد يضمن الفوز، والتشكيلة المتنوعة مهمة.";
+
+ const bestPlayer=game.player.map(n=>({n,score:mapFit(byName(n))})).sort((a,b)=>b.score-a.score)[0];
+ const bestAI=game.ai.map(n=>({n,score:mapFit(byName(n))})).sort((a,b)=>b.score-a.score)[0];
+
+ const playerCounters=game.player.reduce((sum,n)=>sum+counterAgainstTeam(byName(n),game.ai),0)/Math.max(1,game.player.length);
+ const aiCounters=game.ai.reduce((sum,n)=>sum+counterAgainstTeam(byName(n),game.player),0)/Math.max(1,game.ai.length);
+
+ const pTraits=game.player.map(n=>traits(byName(n)));
+ let strengths=[],weaknesses=[];
+ if(pTraits.some(x=>x.range>=8)&&mp.open>=6)strengths.push("وجود مدى مناسب لاستغلال المساحات المفتوحة");
+ if(pTraits.some(x=>x.control>=8)&&mp.walls>=5)strengths.push("قدرة جيدة على التحكم بالممرات والمنطقة");
+ if(pTraits.some(x=>x.mobility>=8))strengths.push("حركة جيدة للهروب والضغط وتغيير المسار");
+ if(pTraits.some(x=>x.thrower)&&mp.walls>=7)strengths.push("وجود رامي يستفيد من كثرة الجدران");
+ if(!pTraits.some(x=>x.range>=8)&&mp.open>=8)weaknesses.push("نقص المدى البعيد في خريطة مفتوحة");
+ if(!pTraits.some(x=>x.control>=8)&&["area","control"].includes(mp.objective))weaknesses.push("ضعف نسبي في السيطرة على الهدف");
+ if(playerCounters<aiCounters-2)weaknesses.push("بعض مواجهات الشخصيات تميل لصالح الخصم على هذه الخريطة");
+
+ const report=buildMatchupReport();
+
+ document.getElementById("analysis").innerHTML=`
+ <div class="analysisTitle">🧠 تقرير الذكاء الاصطناعي المتقدم</div><div class="analysisBlock"><b>🚫 المحظورات:</b> ${game.bans?.join("، ")||"—"}</div>
+ <div class="analysisBlock"><b>🗺️ تأثير الخريطة:</b> ${mapDescription}</div>
+ <div class="analysisBlock"><b>⭐ أفضل ملاءمة للخريطة:</b> فريقك: <b>${bestPlayer?.n||"—"}</b> — الخصم: <b>${bestAI?.n||"—"}</b>.</div>
+ <div class="analysisBlock"><b>🤝 نقاط قوة فريقك:</b> ${strengths.length?strengths.join("، "):"تشكيلة متوازنة لكن دون أفضلية واضحة."}</div>
+ <div class="analysisBlock"><b>⚠️ نقاط الضعف:</b> ${weaknesses.length?weaknesses.join("، "):"لا توجد فجوة كبيرة واضحة."}</div>
+ <div class="analysisBlock"><b>⚔️ تفسير المواجهات:</b> لا يعتمد المحرك على الـCounter الثابت فقط؛ كل مواجهة أدناه تتغير حسب الانفتاح والجدران والشجيرات والهدف.</div>
+ <div class="matchupReport">${report}</div>
+ <div class="analysisBlock"><b>🎯 الخلاصة:</b> ${playerCounters>aiCounters+2?"تشكيلتك تستفيد من الخريطة والمواجهات الحالية بشكل أفضل.":aiCounters>playerCounters+2?"تشكيلة الخصم تستفيد من ظروف الخريطة والمواجهات أكثر.":"المواجهة متقاربة، والتموضع واستخدام كل شخصية في الـLane المناسب قد يحسمان الأفضلية."}</div>
+ <div class="analysisBlock"><b>💡 نصيحة:</b> لا تعتبر شخصية Counter ثابتًا لشخصية أخرى؛ نفس المواجهة قد تنقلب تمامًا بين خريطة مفتوحة وخريطة مليئة بالجدران.</div>`;
+
+ stats.drafts++;
+ if(pScore>aScore)stats.wins++;else if(aScore>pScore)stats.losses++;else stats.draws++;
+ localStorage.setItem("stats",JSON.stringify(stats));
+ showScreen("result");
+}
+function showStats(){document.getElementById("statsContent").innerHTML=`🎮 عدد الـDraft: <b>${stats.drafts}</b><br><br>🏆 أفضلية فريقي: <b>${stats.wins}</b><br><br>🔴 أفضلية الخصم: <b>${stats.losses}</b><br><br>⚔️ متقارب: <b>${stats.draws}</b>`;showScreen("stats")}
+const TRANSLATIONS={
+ ar:{dir:"rtl",title:"🏆 Ranked Draft Simulator",sub:"محاكي Ranked Draft",home:"محاكي Ranked Draft",start:"▶️ بدء Draft",my:"👤 شخصياتي",maps:"🗺️ الخرائط المتاحة",stats:"📊 الإحصائيات",settings:"⚙️ الإعدادات",mode:"نمط اللعب",mapChoice:"طريقة اختيار الخريطة",mapsCount:"عدد الخرائط التي تظهر للاختيار العشوائي",difficulty:"مستوى AI",language:"🌐 اللغة"},
+ en:{dir:"ltr",title:"🏆 Ranked Draft Simulator",sub:"Ranked Draft Simulator",home:"Ranked Draft Simulator",start:"▶️ Start Draft",my:"👤 My Brawlers",maps:"🗺️ Maps",stats:"📊 Statistics",settings:"⚙️ Settings",mode:"Game Mode",mapChoice:"Map Selection",mapsCount:"Random Maps To Show",difficulty:"AI Difficulty",language:"🌐 Language"},
+ fr:{dir:"ltr",title:"🏆 Ranked Draft Simulator",sub:"Simulateur de Draft",home:"Simulateur de Draft",start:"▶️ Commencer le Draft",my:"👤 Mes personnages",maps:"🗺️ Cartes",stats:"📊 Statistiques",settings:"⚙️ Paramètres",mode:"Mode de jeu",mapChoice:"Sélection de carte",mapsCount:"Cartes aléatoires à afficher",difficulty:"Difficulté IA",language:"🌐 Langue"},
+ es:{dir:"ltr",title:"🏆 Ranked Draft Simulator",sub:"Simulador de Draft",home:"Simulador de Draft",start:"▶️ Iniciar Draft",my:"👤 Mis personajes",maps:"🗺️ Mapas",stats:"📊 Estadísticas",settings:"⚙️ Ajustes",mode:"Modo de juego",mapChoice:"Selección de mapa",mapsCount:"Mapas aleatorios",difficulty:"Dificultad IA",language:"🌐 Idioma"},
+ tr:{dir:"ltr",title:"🏆 Ranked Draft Simulator",sub:"Draft Simülatörü",home:"Draft Simülatörü",start:"▶️ Draft Başlat",my:"👤 Karakterlerim",maps:"🗺️ Haritalar",stats:"📊 İstatistikler",settings:"⚙️ Ayarlar",mode:"Oyun Modu",mapChoice:"Harita Seçimi",mapsCount:"Gösterilecek Rastgele Haritalar",difficulty:"AI Zorluğu",language:"🌐 Dil"}
+};
+function changeLanguage(lang){
+ settings.language=lang;localStorage.setItem("settings",JSON.stringify(settings));applyLanguage();
+}
+function applyLanguage(){
+ const lang=settings.language||"ar",t=TRANSLATIONS[lang]||TRANSLATIONS.ar;
+ document.documentElement.lang=lang;document.documentElement.dir=t.dir;
+ document.querySelector("h1").textContent=t.title;
+ document.querySelector(".sub").textContent=t.sub;
+ const menu=document.querySelectorAll("#home .menu button");
+ if(menu.length>=4){menu[0].textContent=t.start;menu[1].textContent=t.my;menu[2].textContent=t.maps;menu[3].textContent=t.stats;if(menu[4])menu[4].textContent=t.settings}
+ const el=id=>document.getElementById(id);
+ if(el("modeLabel"))el("modeLabel").textContent=t.mode;
+ if(el("mapChoiceLabel"))el("mapChoiceLabel").textContent=t.mapChoice;
+ if(el("mapsCountLabel"))el("mapsCountLabel").textContent=t.mapsCount;
+ if(el("difficultyLabel"))el("difficultyLabel").textContent=t.difficulty;
+ if(el("languageLabel"))el("languageLabel").textContent=t.language;
+}
+function showSettings(){document.getElementById("timerEnabled").checked=settings.timer!==false;document.getElementById("languageSelect").value=settings.language||"ar";showScreen("settings")}
+function saveSettings(){settings.timer=document.getElementById("timerEnabled").checked;localStorage.setItem("settings",JSON.stringify(settings))}
+applyLanguage();loadData();
+</script>
+</body></html>
